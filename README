@@ -1,0 +1,5 @@
+# Installation instruction:
+#
+# python custom_setup.py install --prefix $PWD
+#
+# This will install kde.c in the current directory.
