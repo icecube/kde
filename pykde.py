@@ -25,7 +25,7 @@ from scipy.stats import mvn
 
 # stat_tools imports
 #from stat_tools.stat_tools import weighted_cov
-from stat_tools import weighted_cov
+from .stat_tools import weighted_cov
 
 __all__ = ['gaussian_kde','bootstrap_kde']
 
