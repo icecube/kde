@@ -1,33 +1,20 @@
-#-------------------------------------------------------------------------------
-#  Class for kernel density estimation.
-#  Currently, only Gaussian kernels are implemented.
-#  Written by: Sebastian Schoenen
-#  Date: 2014-01-17
-#-------------------------------------------------------------------------------
+# Author: Sebastian Schoenen
+# Date: 2014-01-17
+"""
+Class for kernel density estimation.
+Currently, only Gaussian kernels are implemented.
+"""
 
-from __future__ import division, print_function, absolute_import
+from __future__ import division, print_function
 from copy import copy
 
-# Standard library imports.
-import warnings
-
-# Scipy imports.
-from scipy.lib.six import callable, string_types
-from scipy import linalg, special
-
 from numpy import *
-from numpy.random import randint, multivariate_normal
 import numexpr
+from scipy import linalg
 
-# Local imports.
-from scipy.stats import mvn
-#from scipy import mvn
+from stat_tools import weighted_cov
 
-# stat_tools imports
-#from stat_tools.stat_tools import weighted_cov
-from .stat_tools import weighted_cov
-
-__all__ = ['gaussian_kde','bootstrap_kde']
+__all__ = ['gaussian_kde', 'bootstrap_kde']
 
 
 class gaussian_kde(object):
@@ -55,8 +42,8 @@ class gaussian_kde(object):
         if the adaptive bandwidth should be calculated by
         the weighted (True) or unweighted (False) dataset.
     alpha : float
-        The sensitivity parameter alpha in the range [0,1] is needed for the adaptive KDE.
-        Also for this see:
+        The sensitivity parameter alpha in the range [0,1] is needed for the
+        adaptive KDE. Also for this see:
         Algorithm 3.1 in DOI: 10.1214/154957804100000000 
     bw_method : str, scalar or callable, optional
         The method used to calculate the estimator bandwidth.  This can be
@@ -179,28 +166,33 @@ class gaussian_kde(object):
     >>> plt.show()
 
     """
-    def __init__(self, dataset, weights=None, kde_values=None,
-                 adaptive=False, weight_adaptive_bw=False, alpha=0.3, bw_method=None):
+    def __init__(self, dataset, weights=None, kde_values=None, adaptive=False,
+                 weight_adaptive_bw=False, alpha=0.3, bw_method=None):
         self.dataset = atleast_2d(dataset)
         self.d, self.n = self.dataset.shape
-        max_array_length = 1e8 #maximum amount of data in memory (~2GB, scales linearly)
-        self.m_max = floor(max_array_length/self.n)
+
+        max_array_length = 1e8
+        """Maximum amount of data in memory (~2GB, scales linearly)"""
+
+        self.m_max = int(floor(max_array_length/self.n))
         if self.n > max_array_length:
             raise ValueError("`dataset` is too large (too many array entries)!")
         
-        if weights != None and len(weights)==self.n:
+        if weights is not None and len(weights)==self.n:
             self.weights = weights
-        elif weights == None:
+        elif weights is None:
             self.weights = ones(self.n)
         else:
             raise ValueError("unequal dimension of `dataset` and `weights`.")
 
         self.kde_values = kde_values
-        if self.kde_values != None:
-            print("Warning: By giving `kde_values`, `weight_adaptive_bw` is useless. " \
-                   "You have to be sure what was used to calculate those values!")
+        if self.kde_values is not None:
+            print("Warning: By giving `kde_values`, `weight_adaptive_bw` is"
+                  " useless. You have to be sure what was used to calculate"
+                  " those values!")
             if len(self.kde_values)!=self.n:
-                raise ValueError("unequal dimension of `dataset` and `kde_values`.")
+                raise ValueError("unequal dimension of `dataset` and"
+                                 " `kde_values`.")
         if not self.dataset.size > 1:
             raise ValueError("`dataset` input should have multiple elements.")
         
@@ -217,7 +209,7 @@ class gaussian_kde(object):
             if self.alpha < 0. or self.alpha > 1.:
                 raise ValueError("`alpha` has to be in the range [0,1].")
             self._compute_adaptive_covariance()
-        elif not self.adaptive and self.kde_values != None:
+        elif not self.adaptive and self.kde_values is not None:
             raise ValueError("Giving `kde_values`, `adaptive` cannot be False!")
 
     def evaluate(self, points, adaptive=False):
@@ -251,48 +243,50 @@ class gaussian_kde(object):
                 points = reshape(points, (m,d))
                 d, m = points.shape
             else:
-                msg = "points have dimension %s, dataset has dimension %s" % (d,self.d)
-                raise ValueError(msg)
+                raise ValueError("points have dimension %s, dataset has"
+                                 " dimension %s" % (d, self.d))
         
-        nloops = ceil(m/self.m_max)
+        nloops = int(ceil(m/self.m_max))
         dm = self.m_max
         modulo_dm = m%dm
         results = empty((m,), dtype=float)
         if adaptive:
             inv_loc_bw = self.inv_loc_bw
 
-            for i in xrange(int(nloops)):
+            for i in xrange(nloops):
                 index = i*dm
                 if modulo_dm and i==(nloops-1):
                     dm = modulo_dm
                 pt = points[:,index:index+dm].T.reshape(dm,self.d,1)
 
-                if self.d == 1: # has to be done due to BUG in `numexpr` (`sum` in `numexpr` != `numpy.sum`)
-                    energy = numexpr.evaluate("(ds - pt)**2",optimization='aggressive').reshape(dm,self.n)
+                # has to be done due to BUG in `numexpr` (`sum` in `numexpr` != `numpy.sum`)
+                if self.d == 1:
+                    energy = numexpr.evaluate("(ds - pt)**2", optimization='aggressive').reshape(dm, self.n)
                 else:
-                    energy = numexpr.evaluate("sum((ds - pt)**2, axis=1)",optimization='aggressive')
+                    energy = numexpr.evaluate("sum((ds - pt)**2, axis=1)", optimization='aggressive')
 
-                results[index:index+dm] = numexpr.evaluate("sum(normalized_weights * exp(-0.5 * energy * inv_loc_bw), axis=1)",optimization='aggressive')
+                results[index:index+dm] = numexpr.evaluate("sum(normalized_weights * exp(-0.5 * energy * inv_loc_bw), axis=1)", optimization='aggressive')
                 del pt
 
         else:
-            for i in xrange(int(nloops)):
+            for i in xrange(nloops):
                 index = i*dm
                 if modulo_dm and i==(nloops-1):
                     dm = modulo_dm
                 pt = points[:,index:index+dm].T.reshape(dm,self.d,1)
 
-                if self.d == 1: # has to be done due to BUG in `numexpr` (`sum` in `numexpr` != `numpy.sum`)
-                    energy = numexpr.evaluate("(ds - pt)**2",optimization='aggressive').reshape(dm,self.n)
+                # has to be done due to BUG in `numexpr` (`sum` in `numexpr` != `numpy.sum`)
+                if self.d == 1:
+                    energy = numexpr.evaluate("(ds - pt)**2", optimization='aggressive').reshape(dm, self.n)
                 else:
-                    energy = numexpr.evaluate("sum((ds - pt)**2, axis=1)",optimization='aggressive')
+                    energy = numexpr.evaluate("sum((ds - pt)**2, axis=1)", optimization='aggressive')
 
-                results[index:index+dm] = numexpr.evaluate("sum(normalized_weights * exp(-0.5 * energy), axis=1)",optimization='aggressive')
+                results[index:index+dm] = numexpr.evaluate("sum(normalized_weights * exp(-0.5 * energy), axis=1)", optimization='aggressive')
                 del pt
 
         return results
 
-    def __call__(self,points):
+    def __call__(self, points):
         return self.evaluate(points, adaptive=self.adaptive)
 
     def scotts_factor(self):
@@ -348,16 +342,15 @@ class gaussian_kde(object):
             self.covariance_factor = self.scotts_factor
         elif bw_method == 'silverman':
             self.covariance_factor = self.silverman_factor
-        elif isscalar(bw_method) and not isinstance(bw_method, string_types):
+        elif isscalar(bw_method) and not isinstance(bw_method, basestring):
             self._bw_method = 'use constant'
             self.covariance_factor = lambda: bw_method
         elif callable(bw_method):
             self._bw_method = bw_method
             self.covariance_factor = lambda: self._bw_method(self)
         else:
-            msg = "`bw_method` should be 'scott', 'silverman', a scalar " \
-                  "or a callable."
-            raise ValueError(msg)
+            raise ValueError("`bw_method` should be 'scott', 'silverman', a"
+                             " scalar or a callable.")
 
         self._compute_covariance()
 
@@ -367,7 +360,9 @@ class gaussian_kde(object):
         """
         factor = self.covariance_factor()
         # Cache covariance and inverse covariance of the data
-        data_covariance = atleast_2d(weighted_cov(self.dataset, weights=self.weights, bias=False))
+        data_covariance = atleast_2d(weighted_cov(self.dataset,
+                                                  weights=self.weights,
+                                                  bias=False))
         data_inv_cov = linalg.inv(data_covariance)
 
         covariance = data_covariance * factor**2
@@ -384,28 +379,40 @@ class gaussian_kde(object):
         """Computes an adaptive covariance matrix for each Gaussian kernel using
         _compute_covariance().
         """
-        #evaluate dataset for kde without adaptive kernel:
+        # Evaluate dataset for kde without adaptive kernel:
         if self.kde_values == None:
             if self.weight_adaptive_bw:
-                self.kde_values = self.evaluate(self.dataset,adaptive=False)
+                self.kde_values = self.evaluate(self.dataset, adaptive=False)
             else:
                 weights_temp = copy(self.weights)
                 self.weights = ones(self.n)
                 self._compute_covariance()
-                self.kde_values = self.evaluate(self.dataset,adaptive=False)
+                self.kde_values = self.evaluate(self.dataset, adaptive=False)
                 self.weights = weights_temp
                 self._compute_covariance()
 
-        #define global bandwidth `glob_bw` by using the kde without adaptive kernel:
-        glob_bw = exp(1./self.n * sum(log(self.kde_values))) #is this really self.n or should it be sum(weights)
-        #define local bandwidth `loc_bw`:
+        # Define global bandwidth `glob_bw` by using the kde without adaptive kernel:
+        # NOTE: is this really self.n or should it be sum(weights)?
+        glob_bw = exp(1./self.n * sum(log(self.kde_values)))
+        # Define local bandwidth `loc_bw`:
         self.inv_loc_bw = power(self.kde_values/glob_bw, 2.*self.alpha)
 
         #inv_local_norm_factors = self._inv_norm_factor * power(self.inv_loc_bw, 0.5*self.d)
         self._normalized_weights = self._normalized_weights * power(self.inv_loc_bw, 0.5*self.d)
 
 class bootstrap_kde(object):
-    def __init__(self,dataset,niter=10,**kwargs):
+    """Bootstrapping to estimate uncertainty in KDE.
+
+    Parameters
+    ----------
+    dataset
+    niter : int > 0
+    **kwargs
+        Passed on to `gaussian_kde`, except 'weights' which,if present, is
+        extracted and re-sampled in the same manner as `dataset`.
+
+    """
+    def __init__(self, dataset, niter=10, **kwargs):
         self.kernels = []
         self.bootstrap_indices = []
 
@@ -419,20 +426,21 @@ class bootstrap_kde(object):
         for i in xrange(niter):
             indices = self.get_bootstrap_indices()
             self.bootstrap_indices.append(indices)
-            if weights != None:
-                kernel = gaussian_kde(self.dataset[:,indices],weights=weights[indices],**kwargs)
+            if weights is not None:
+                kernel = gaussian_kde(self.dataset[:,indices],
+                                      weights=weights[indices], **kwargs)
                 self.kernels.append(kernel)
             else:
-                kernel = gaussian_kde(self.dataset[:,indices],**kwargs)
+                kernel = gaussian_kde(self.dataset[:,indices], **kwargs)
                 self.kernels.append(kernel)
 
-    def __call__(self,points):
+    def __call__(self, points):
         return self.evaluate(points)
 
-    def evaluate(self,points):
+    def evaluate(self, points):
         points = atleast_2d(points)
         d, m = points.shape
-        means,sqmeans = zeros(m),zeros(m)
+        means, sqmeans = zeros(m), zeros(m)
         for kernel in self.kernels:
             values = kernel(points)
             means += values
@@ -443,6 +451,13 @@ class bootstrap_kde(object):
         return means, errors
 
     def get_bootstrap_indices(self):
+        """Get random indices used to resample (with replacement) `dataset`.
+
+        Returns
+        -------
+        bootstrap_indices : array
+
+        """
         indices = arange(self.n)
         bootstrap_indices = random.choice(self.n, size=self.n, replace=True)
         return bootstrap_indices
