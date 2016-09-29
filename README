@@ -1,5 +1,9 @@
-# Installation Instructions
+Authors
+-------
+Sebastian Schoenen, Martin Leuermann for the IceCube collaboration.
 
+Installation Instructions
+-------------------------
 Download the software into directory <DIR>. There should be a subdirectory
 named "kde" within the <DIR> directory.
 
