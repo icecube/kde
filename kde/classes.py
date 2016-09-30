@@ -2,7 +2,6 @@ import kde
 import numpy as np
 from stat_tools import weighted_cov
 
-
 class KDE:
     """Initialize KDE object
 
@@ -41,8 +40,7 @@ class KDE:
             self.w = np.ones(self.n)*1.0/self.n
             self.setCovariance(weights=False)
         else:
-            raise AssertionError("Length of data (%d) and length of weights"
-                                 " (%d) incompatible." % (self.n, len(weights)))
+            raise AssertionError("Length of data (%d) and length of weights (%d) incompatible." % (self.n, len(weights)))
 
         self.hMethod = method
 
@@ -193,17 +191,11 @@ class KDE:
             self.preFac = -0.5/np.power(self.h, 2) #self.d)
         elif mode == "kde":
             self.w_norm = (
-                self.weights *
-                np.sqrt(
-                    self.detC /
-                    np.power(2.0*np.pi*self.h*self.h*self.lambdas*self.lambdas,
-                             self.d)
-                )
+                self.weights * np.sqrt(self.detC / np.power(2.0*np.pi*self.h*self.h*self.lambdas*self.lambdas, self.d))
             )
             self.preFac = -0.5/np.power(self.h*self.lambdas, 2) #self.d
         else:
-            raise ValueError("Could not configure kde object. Unknown mode: %s"
-                             %(mode,))
+            raise ValueError("Could not configure kde object. Unknown mode: %s" %(mode,))
 
     def cuda_calc_lambdas(self):
         """Calculate lambdas using cuda implementation"""
@@ -251,7 +243,7 @@ class KDE:
             addDeclare = ""
             calculation = """
                 ent1 = x1[j]-x1[idx];
-                thisKde +=  w_norm_lambda[j] * exp(preFac * (ent1*c*ent1));
+                thisKde += w_norm_lambda[j] * exp(preFac * (ent1*c*ent1));
             """
 
         # define function on gpu to be executed

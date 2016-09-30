@@ -1,4 +1,4 @@
-# Written by: Sebastian Schoenen
+# Author: Sebastian Schoenen
 # Date: 2014-01-17
 """
 Class for kernel density estimation.
@@ -10,7 +10,7 @@ from copy import copy
 
 from numpy import *
 import numexpr
-from scipy import linalg, special
+from scipy import linalg
 
 from stat_tools import weighted_cov
 
@@ -257,10 +257,9 @@ class gaussian_kde(object):
                 index = i*dm
                 if modulo_dm and i==(nloops-1):
                     dm = modulo_dm
-                pt = points[:,index:index+dm].T.reshape(dm, self.d, 1)
+                pt = points[:,index:index+dm].T.reshape(dm,self.d,1)
 
-                # has to be done due to BUG in `numexpr` (`sum` in `numexpr` !=
-                # `numpy.sum`)
+                # has to be done due to BUG in `numexpr` (`sum` in `numexpr` != `numpy.sum`)
                 if self.d == 1:
                     energy = numexpr.evaluate("(ds - pt)**2", optimization='aggressive').reshape(dm, self.n)
                 else:
@@ -274,10 +273,9 @@ class gaussian_kde(object):
                 index = i*dm
                 if modulo_dm and i==(nloops-1):
                     dm = modulo_dm
-                pt = points[:,index:index+dm].T.reshape(dm, self.d, 1)
+                pt = points[:,index:index+dm].T.reshape(dm,self.d,1)
 
-                # has to be done due to BUG in `numexpr` (`sum` in `numexpr` !=
-                # `numpy.sum`)
+                # has to be done due to BUG in `numexpr` (`sum` in `numexpr` != `numpy.sum`)
                 if self.d == 1:
                     energy = numexpr.evaluate("(ds - pt)**2", optimization='aggressive').reshape(dm, self.n)
                 else:
@@ -381,7 +379,7 @@ class gaussian_kde(object):
         """Computes an adaptive covariance matrix for each Gaussian kernel using
         _compute_covariance().
         """
-        #evaluate dataset for kde without adaptive kernel:
+        # Evaluate dataset for kde without adaptive kernel:
         if self.kde_values == None:
             if self.weight_adaptive_bw:
                 self.kde_values = self.evaluate(self.dataset, adaptive=False)
@@ -393,19 +391,17 @@ class gaussian_kde(object):
                 self.weights = weights_temp
                 self._compute_covariance()
 
-        # Define global bandwidth `glob_bw` by using the kde without adaptive
-        # kernel:
-        # NOTE: is this really self.n or should it be sum(weights)
+        # Define global bandwidth `glob_bw` by using the kde without adaptive kernel:
+        # NOTE: is this really self.n or should it be sum(weights)?
         glob_bw = exp(1./self.n * sum(log(self.kde_values)))
         # Define local bandwidth `loc_bw`:
         self.inv_loc_bw = power(self.kde_values/glob_bw, 2.*self.alpha)
 
         #inv_local_norm_factors = self._inv_norm_factor * power(self.inv_loc_bw, 0.5*self.d)
-        self._normalized_weights = (self._normalized_weights
-                * power(self.inv_loc_bw, 0.5*self.d))
+        self._normalized_weights = self._normalized_weights * power(self.inv_loc_bw, 0.5*self.d)
 
 class bootstrap_kde(object):
-    """
+    """Bootstrapping to estimate uncertainty in KDE.
 
     Parameters
     ----------

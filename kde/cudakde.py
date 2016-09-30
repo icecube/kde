@@ -1,4 +1,4 @@
-import numpy as np
+import numpy as n
 import warnings
 
 from classes import KDE
@@ -14,7 +14,7 @@ class gaussian_kde(KDE):
                      method=bw_method)
 
         self.weighted = len(weights) > 0
-        
+
         if adaptive:
             if not self.weighted and weight_adaptive_bw:
                 warnings.warn("Since `weights` aren't given"
@@ -22,12 +22,12 @@ class gaussian_kde(KDE):
             self.calcLambdas(weights=weight_adaptive_bw,
                              weightedCov=weight_adaptive_bw)
         else:
-            self.lambdas = np.ones(self.n)
+            self.lambdas = n.ones(self.n)
 
     def __call__(self, points):
-        points = np.atleast_2d(points)
+        points = n.atleast_2d(points)
         self.kde(points, weights=self.weighted, weightedCov=self.weighted)
-        return np.array(self.values)
+        return n.array(self.values)
 
 
 class bootstrap_kde(object):
@@ -38,12 +38,12 @@ class bootstrap_kde(object):
         self.kernels = []
         self.bootstrap_indices = []
 
-        self.data = np.atleast_2d(data)
+        self.data = n.atleast_2d(data)
         self.d, self.n = self.data.shape
         self.weighted = len(weights) > 0
 
         for i in xrange(int(niter)):
-            indices = np.array(self.get_bootstrap_indices())
+            indices = n.array(self.get_bootstrap_indices())
             self.bootstrap_indices.append(indices)
             if self.weighted:
                 kernel = gaussian_kde(data[...,indices],
@@ -57,20 +57,19 @@ class bootstrap_kde(object):
         return self.evaluate(points)
 
     def evaluate(self, points):
-        points = np.atleast_2d(points)
+        points = n.atleast_2d(points)
         d, m = points.shape
-        means, sqmeans = np.zeros(m), np.zeros(m)
+        means, sqmeans = n.zeros(m), n.zeros(m)
         for kernel in self.kernels:
             values = kernel(points)
             means += values
             sqmeans += values**2
         means /= len(self.kernels)
         sqmeans /= len(self.kernels)
-        errors = np.sqrt(sqmeans - means**2)
+        errors = n.sqrt(sqmeans - means**2)
         return means, errors
 
     def get_bootstrap_indices(self):
-        indices = np.arange(self.n)
-        bootstrap_indices = np.random.choice(self.n, size=self.n, replace=True)
+        indices = n.arange(self.n)
+        bootstrap_indices = n.random.choice(self.n, size=self.n, replace=True)
         return bootstrap_indices
-
