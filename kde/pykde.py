@@ -8,8 +8,8 @@ Currently, only Gaussian kernels are implemented.
 from __future__ import division, print_function
 from copy import copy
 
-from numpy import *
 import numexpr
+from numpy import *
 from scipy import linalg
 
 from stat_tools import weighted_cov
@@ -166,8 +166,8 @@ class gaussian_kde(object):
     >>> plt.show()
 
     """
-    def __init__(self, dataset, weights=None, kde_values=None, adaptive=False,
-                 weight_adaptive_bw=False, alpha=0.3, bw_method=None):
+    def __init__(self, dataset, weights=None, kde_values=None,
+                 adaptive=False, weight_adaptive_bw=False, alpha=0.3, bw_method='silverman'):
         self.dataset = atleast_2d(dataset)
         self.d, self.n = self.dataset.shape
 
@@ -191,8 +191,7 @@ class gaussian_kde(object):
                   " useless. You have to be sure what was used to calculate"
                   " those values!")
             if len(self.kde_values)!=self.n:
-                raise ValueError("unequal dimension of `dataset` and"
-                                 " `kde_values`.")
+                raise ValueError("unequal dimension of `dataset` and `kde_values`.")
         if not self.dataset.size > 1:
             raise ValueError("`dataset` input should have multiple elements.")
         
@@ -243,8 +242,8 @@ class gaussian_kde(object):
                 points = reshape(points, (m,d))
                 d, m = points.shape
             else:
-                raise ValueError("points have dimension %s, dataset has"
-                                 " dimension %s" % (d, self.d))
+                msg = "points have dimension %s, dataset has dimension %s" % (d, self.d)
+                raise ValueError(msg)
         
         nloops = int(ceil(m/self.m_max))
         dm = self.m_max
@@ -349,8 +348,9 @@ class gaussian_kde(object):
             self._bw_method = bw_method
             self.covariance_factor = lambda: self._bw_method(self)
         else:
-            raise ValueError("`bw_method` should be 'scott', 'silverman', a"
-                             " scalar or a callable.")
+            msg = "`bw_method` should be 'scott', 'silverman', a scalar " \
+                  "or a callable."
+            raise ValueError(msg)
 
         self._compute_covariance()
 
@@ -360,9 +360,7 @@ class gaussian_kde(object):
         """
         factor = self.covariance_factor()
         # Cache covariance and inverse covariance of the data
-        data_covariance = atleast_2d(weighted_cov(self.dataset,
-                                                  weights=self.weights,
-                                                  bias=False))
+        data_covariance = atleast_2d(weighted_cov(self.dataset, weights=self.weights, bias=False))
         data_inv_cov = linalg.inv(data_covariance)
 
         covariance = data_covariance * factor**2
@@ -379,7 +377,7 @@ class gaussian_kde(object):
         """Computes an adaptive covariance matrix for each Gaussian kernel using
         _compute_covariance().
         """
-        # Evaluate dataset for kde without adaptive kernel:
+        # evaluate dataset for kde without adaptive kernel:
         if self.kde_values == None:
             if self.weight_adaptive_bw:
                 self.kde_values = self.evaluate(self.dataset, adaptive=False)
@@ -427,8 +425,7 @@ class bootstrap_kde(object):
             indices = self.get_bootstrap_indices()
             self.bootstrap_indices.append(indices)
             if weights is not None:
-                kernel = gaussian_kde(self.dataset[:,indices],
-                                      weights=weights[indices], **kwargs)
+                kernel = gaussian_kde(self.dataset[:,indices], weights=weights[indices], **kwargs)
                 self.kernels.append(kernel)
             else:
                 kernel = gaussian_kde(self.dataset[:,indices], **kwargs)
