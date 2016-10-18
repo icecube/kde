@@ -1,0 +1,30 @@
+# Ignore precompiled packages
+*.py[cod]
+
+# Ignore cached
+
+# OSX finder files
+.DS_Store
+
+# Ignore auto-generated libraries and files
+*.so
+*.o
+
+# Packages
+dist
+build
+*.egg-info
+
+# Common editor remnants
+*~
+*.swp
+
+# Unison backups
+.backup
+
+# Plots
+*.pdf
+*.png
+
+# IPython notebook backups
+.ipynb_checkpoints
