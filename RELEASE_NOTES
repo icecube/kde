@@ -1,0 +1,5 @@
+October 18, 2016 Sebastian Schoenen (schoenen@physik.rwth-aachen.de)
+----------------------------------------------------------------------------
+Release V00-00-02
+- c code now supports n-dim. kdes
+- pykde: bw_method default changed from 'None' to 'silverman'
