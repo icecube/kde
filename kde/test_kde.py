@@ -1,4 +1,11 @@
-#coding: utf-8
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+"""
+Test functions for the kde library.
+"""
+
+
+from __future__ import absolute_import, division, print_function
 
 import numpy as np
 
@@ -226,7 +233,8 @@ def test_kde(version, sampling_method, bw_method, n_samples, adaptive,
     )
 
 
-if __name__ == "__main__":
+def main():
+    """Main"""
     test_kde(version='cudakde',
              sampling_method='exponential',
              bw_method='silverman',
@@ -234,7 +242,7 @@ if __name__ == "__main__":
              adaptive=True,
              alpha=0.3,
              weight_adaptive_bw=True)
-    print "<< test_kde.py / cudakde : PASSED >>"
+    print("<< test_kde.py / cudakde : PASS >>")
     test_kde(version='pykde',
              sampling_method='exponential',
              bw_method='silverman',
@@ -242,5 +250,8 @@ if __name__ == "__main__":
              adaptive=True,
              alpha=0.3,
              weight_adaptive_bw=False)
-    print "<< test_kde.py / pykde : PASSED >>"
+    print("<< test_kde.py / pykde : PASS >>")
 
+
+if __name__ == "__main__":
+    main()

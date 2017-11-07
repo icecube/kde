@@ -14,7 +14,9 @@ if __name__ == "__main__":
     setup(
         name='kde',
         version='0.1',
-        description='Advanced accelerated Kernel Density Estimation (KDE)',
+        description=('Multi-dimensional Kernel Density Estimation (KDE)'
+                     ' including adaptive bandwidths and C and'
+                     ' CUDA implementations for specific cases.'),
         author='Sebastian Schoenen',
         author_email='schoenen@physik.rwth-aachen.de',
         url='http://code.icecube.wisc.edu/svn/sandbox/schoenen/kde',
@@ -26,5 +28,7 @@ if __name__ == "__main__":
         extras_require={'cuda': ['pycuda']},
         ext_modules=[ckde],
         packages=['kde'],
-        scripts=['kde/test_kde.py']
+        entry_points={
+            'console_scripts': ['test_kde.py = kde.test_kde:main']
+        }
     )

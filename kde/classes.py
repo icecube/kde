@@ -1,10 +1,9 @@
-import kde
-
 import numpy as np
 from scipy.interpolate import RectBivariateSpline as spl2D
 
-from stat_tools import weighted_cov
 import pykde
+from stat_tools import weighted_cov
+
 
 class KDE:
     """Initialize KDE object

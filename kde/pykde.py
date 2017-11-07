@@ -5,7 +5,9 @@ Class for kernel density estimation.
 Currently, only Gaussian kernels are implemented.
 """
 
+
 from __future__ import division, print_function
+
 from copy import copy
 
 import numexpr
@@ -13,6 +15,7 @@ from numpy import *
 from scipy import linalg
 
 from stat_tools import weighted_cov
+
 
 __all__ = ['gaussian_kde', 'bootstrap_kde']
 

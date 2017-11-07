@@ -1,7 +1,14 @@
+kde
+---
+Multi-dimenstional Kernel Density Estimation (KDE) including adaptive
+bandwidths and C and CUDA implementations for specific cases.
+
+
 Authors
 -------
 Sebastian Schoenen (schoenen@physik.rwth-aachen.de) and Martin Leuermann for
 the IceCube collaboration.
+
 
 Installation Instructions
 -------------------------
