@@ -17,9 +17,9 @@ if __name__ == "__main__":
         description=('Multi-dimensional Kernel Density Estimation (KDE)'
                      ' including adaptive bandwidths and C and'
                      ' CUDA implementations for specific cases.'),
-        author='Sebastian Schoenen',
+        author='Sebastian Schoenen, Martin Leuermann',
         author_email='schoenen@physik.rwth-aachen.de',
-        url='http://code.icecube.wisc.edu/svn/sandbox/schoenen/kde',
+        url='https://github.com/icecubeopensource/kde',
         install_requires=[
             'numexpr',
             'numpy',

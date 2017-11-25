@@ -1,11 +1,19 @@
+# pylint: disable=line-too-long, invalid-name
+
+
+from __future__ import absolute_import, division, print_function
+
+from warnings import warn
+
 import numpy as np
 from scipy.interpolate import RectBivariateSpline as spl2D
 
-import pykde
-from stat_tools import weighted_cov
+from .kde import getLambda_ND, kde_ND
+from .pykde import gaussian_kde
+from .stat_tools import weighted_cov
 
 
-class KDE:
+class KDE(object):
     """Initialize KDE object
 
     Parameters
@@ -17,39 +25,50 @@ class KDE:
     method
 
     """
-    def __init__(self, data, use_cuda, weights=[], alpha=0.3, method='silverman'):
+    def __init__(self, data, use_cuda, weights=None, alpha=0.3, method='silverman'):
         self.use_cuda = use_cuda
         if self.use_cuda:
             import pycuda.driver as cuda
-            import pycuda.autoinit
+            import pycuda.autoinit # pylint: disable=unused-variable
             self.cuda = cuda
 
-        if len(np.array(data).shape) ==1:
-            self.data = np.array([data])
-        else:
-            self.data = np.array(data)
+        self.data = np.atleast_2d(data)
 
         self.d, self.n = self.data.shape
 
         self.alpha = alpha
 
-        if len(weights) == self.n:
-            self.w = weights*1.0/sum(weights)
-            self.setCovariance(weights=True)
-        elif len(weights) == 0:
-            self.w = np.ones(self.n)*1.0/self.n
+        if weights is None or len(weights) == 0:
+            self.w = np.full(shape=self.n, fill_value=1/self.n, dtype=np.float)
             self.setCovariance(weights=False)
+        elif len(weights) == self.n:
+            self.w = np.asarray(weights, dtype=np.float) / np.sum(weights)
+            self.setCovariance(weights=True)
         else:
-            raise AssertionError("Length of data (%d) and length of weights (%d) incompatible." % (self.n, len(weights)))
+            raise AssertionError("Length of data (%d) and length of weights"
+                                 " (%d) incompatible."
+                                 % (self.n, len(weights)))
 
         self.hMethod = method
+        self.lambdas = None
+        self.points = None
+        self.m = None
+        self.d_pt = None
+        self.values = None
+        self.h = None
+        self.weights = None
+        self.w_norm = None
+        self.w_norm_lambdas = None
+        self.preFac = None
+        self.logSum = None
+        self.invGlob = None
 
     def setCovariance(self, weights=False):
         """Set covariance from data and weights
 
         Parameters
         ----------
-        weights : bool
+        weights : bool, optional
 
         """
         if weights:
@@ -64,16 +83,17 @@ class KDE:
             self.c_inv = 1.0/self.c
             self.detC = self.c_inv
 
-    def calcLambdas(self, weights=False, weightedCov=False):
+    def calcLambdas(self, weights=False, weightedCov=False, use_grid=False):
         """Calculate bandwidth lambda for data points in KDE function
 
         Parameters
         ----------
-        weights : bool
-        weightedCov : bool
+        weights : bool, optional
+        weightedCov : bool, optional
+        use_grid : bool, optional
 
         """
-        self.configure("lambdas",  weights=weights, weightedCov=weightedCov)
+        self.configure("lambdas", weights=weights, weightedCov=weightedCov)
 
         if self.use_cuda:
             self.cuda_calc_lambdas()
@@ -81,32 +101,34 @@ class KDE:
             if use_grid and self.d == 2:
                 # grid #
                 N_grid = 100
-                ext = np.zeros([2, self.d])
+                ext = np.zeros((2, self.d))
                 for i in range(self.d):
-                    diff = ( np.max(self.data[i]) - np.min(self.data[i]) ) * 0.1
-                    ext[i][0], ext[i][1] = np.min(self.data[i]) - diff, np.max(self.data[i]) + diff
-                spaces1D = [np.linspace(t[0],t[1],N_grid) for t in ext]
+                    diff = (np.max(self.data[i]) - np.min(self.data[i])) * 0.1
+                    ext[i, 0] = np.min(self.data[i]) - diff
+                    ext[i, 1] = np.max(self.data[i]) + diff
+                spaces1D = [np.linspace(t[0], t[1], N_grid) for t in ext]
                 grid = np.array(np.meshgrid(*spaces1D))
-                grid = grid.reshape([self.d, len(grid.flatten()) / self.d])
+                grid = grid.reshape((self.d, grid.size / self.d))
 
                 # kde #
-                w = self.w if weights else np.ones(len(self.w))*1.0 / len(self.w)
-                ss_kde = pykde.gaussian_kde(self.data, weights=w,
-                                            adaptive=False, weight_adaptive_bw=False,
-                                            alpha=self.alpha, bw_method=self.hMethod)
+                n_w = len(self.w)
+                w = self.w if weights else np.full(shape=n_w, fill_value=1/n_w)
+                ss_kde = gaussian_kde(self.data, weights=w, adaptive=False,
+                                      weight_adaptive_bw=False,
+                                      alpha=self.alpha, bw_method=self.hMethod)
 
-                vals =  ss_kde(grid)    # evaluate in log instead of linear to avoid negative values
+                vals = ss_kde(grid)    # evaluate in log instead of linear to avoid negative values
                 spline1 = spl2D(*spaces1D, z=(np.array(vals)).reshape([N_grid, N_grid]).T, kx=3, ky=3)   # TRANSPOSE HERE!!!!
-                kde_vals2 = np.array([spline1( x,y)[0][0] for x,y in self.data.T]) # go back to linear world
+                kde_vals2 = np.array([spline1(x, y)[0][0] for x, y in self.data.T]) # go back to linear world
 
-                #print "Ratio direct:"
-                #print ( np.array(kde_vals2) - np.array(kde_vals) ) / np.array(kde_vals)
+                #print("Ratio direct:")
+                #print(( np.array(kde_vals2) - np.array(kde_vals) ) / np.array(kde_vals))
 
                 # lambdas #
-                glob_sum = np.exp(np.sum(np.log(kde_vals2)*1.0/len(kde_vals2)))
-                self.lambdas = np.power(kde_vals2 / glob_sum, (-1.0)* self.alpha) #self.alpha*(-1.0)) # hack !!!
+                glob_sum = np.exp(np.sum(np.log(kde_vals2) / len(kde_vals2)))
+                self.lambdas = np.power(kde_vals2 / glob_sum, (-1.0) * self.alpha) #self.alpha*(-1.0)) # hack !!!
             else:
-                self.lambdas = kde_nDim.getLambda_ND(
+                self.lambdas = getLambda_ND(
                     int(self.d),
                     list(self.c_inv.flatten()),
                     list(self.data.flatten()),
@@ -122,31 +144,27 @@ class KDE:
         Parameters
         ----------
         points
-        weights : bool
-        weightedCov : bool
+        weights : bool, optional
+        weightedCov : bool, optional
 
         """
-        if len(np.array(points).shape) ==1:
-            self.points = np.array([points])
-        else:
-            self.points = np.array(points)
+        self.points = np.atleast_2d(points)
         self.d_pt, self.m = self.points.shape
 
-        if self.d > 1 and not self.d == self.d_pt:
+        if self.d > 1 and self.d != self.d_pt:
             assert self.d == self.m
-            points = zip(*points[::1])
+            points = list(zip(*points[::1]))
             self.d_pt, self.m = np.array(points).shape
-            import warnings.warn
-            warnings.warn("Dimensions of given points did not fit initialized"
-                          " kde function. Rotate given sample and proceed"
-                          " with fingers crossed.")
+            warn("Dimensions of given points did not fit initialized kde"
+                 " function. Rotate given sample and proceed with fingers"
+                 " crossed.")
 
         self.configure("kde", weights=weights, weightedCov=weightedCov)
 
         if self.use_cuda:
             self.cuda_kde(points)
         else:
-            self.values = kde_nDim.kde_ND(
+            self.values = kde_ND(
                 int(self.d),
                 list(self.c_inv.flatten()),
                 list(self.data.flatten()),
@@ -167,7 +185,7 @@ class KDE:
         weightedCov : bool
 
         """
-        if isinstance(self.hMethod, str):
+        if isinstance(self.hMethod, basestring):
             if self.hMethod == 'silverman':
                 # (n * (d + 2) / 4.)**(-1. / (d + 4)).
                 self.h = np.power(1.0/(self.n*(self.d+2.0)/4.0), 1.0/(self.d+4.0))
@@ -178,15 +196,18 @@ class KDE:
                                  " constant. Implemented are 'scott',"
                                  " 'silverman'" %(self.hMethod,))
         elif isinstance(self.hMethod, (int, float)):
-                self.h = self.hMethod
+            self.h = self.hMethod
         else:
             raise ValueError("Normalization constant must be of type int,"
                              " float or str!")
 
         self.setCovariance(weights=weightedCov)
 
-        if weights: self.weights = self.w
-        else: self.weights = np.ones(self.n)*1.0/self.n
+        if weights:
+            self.weights = self.w
+        else:
+            self.weights = np.full(shape=self.n, fill_value=1/self.n,
+                                   dtype=np.float)
 
         if mode == "lambdas":
             self.w_norm_lambdas = self.weights * np.sqrt(self.detC / np.power(2.0*np.pi*self.h*self.h, self.d))
@@ -270,15 +291,29 @@ class KDE:
         else:
             bx = np.int32(n)
         gx = np.int32(n/bx)
-        if n % bx != 0: gx += 1
+        if n % bx != 0:
+            gx += 1
 
         func = mod.get_function("CalcLambda") # code compiling
         if self.d == 2:
             # call of gpu function
-            func(d_x1, d_x2, self.c_inv[0][0], self.c_inv[1][0], self.c_inv[0][1], self.c_inv[1][1], n, self.preFac, d_w_norm_lambdas,  d_logSum, d_kde_val_la, block=(int(bx),1,1), grid=(int(gx),1,1))
+            func(d_x1, d_x2,
+                 self.c_inv[0, 0], self.c_inv[1, 0],
+                 self.c_inv[0, 1], self.c_inv[1, 1],
+                 n,
+                 self.preFac,
+                 d_w_norm_lambdas, d_logSum, d_kde_val_la,
+                 block=(int(bx), 1, 1),
+                 grid=(int(gx), 1, 1))
         elif self.d == 1:
             # call of gpu function
-            func(d_x1, self.c_inv, n, self.preFac, d_w_norm_lambdas,  d_logSum, d_kde_val_la, block=(int(bx),1,1), grid=(int(gx),1,1))
+            func(d_x1,
+                 self.c_inv,
+                 n,
+                 self.preFac,
+                 d_w_norm_lambdas, d_logSum, d_kde_val_la,
+                 block=(int(bx), 1, 1),
+                 grid=(int(gx), 1, 1))
 
         # backward copy from gpu to cpu memory
         self.cuda.memcpy_dtoh(h_logSum, d_logSum)
@@ -294,15 +329,12 @@ class KDE:
         Parameters
         ----------
         points
-        weights : bool
+        weights : bool, optional
 
         """
         from pycuda.compiler import SourceModule
 
-        if len(np.array(points).shape) == 1:
-            self.points = np.array([points])
-        else:
-            self.points = np.array(points)
+        self.points = np.atleast_2d(points)
         self.d_pt, self.m = self.points.shape
 
         # conversion of python variables
@@ -382,16 +414,28 @@ class KDE:
         else:
             bx = np.int32(n)
         gx = np.int32(self.m/bx)
-        if n/bx != 0.0: gx += 1
+        if n / bx != 0.0:
+            gx += 1
 
         # code compiling
         func = mod.get_function("CalcKde")
         if self.d == 2:
             # call of gpu function
-            func(d_x1, d_y1, d_x2, d_y2, self.c_inv[0][0], self.c_inv[1][0], self.c_inv[0][1], self.c_inv[1][1], n, m, d_preFac, d_w_norm, d_kde_val, block=(int(bx),1,1), grid=(int(gx),1,1))
+            func(d_x1, d_y1, d_x2, d_y2,
+                 self.c_inv[0, 0], self.c_inv[1, 0],
+                 self.c_inv[0, 1], self.c_inv[1, 1],
+                 n, m,
+                 d_preFac, d_w_norm, d_kde_val,
+                 block=(int(bx), 1, 1),
+                 grid=(int(gx), 1, 1))
         elif self.d == 1:
             # call of gpu function
-            func(d_x1, d_y1, self.c_inv, n, m, d_preFac, d_w_norm, d_kde_val, block=(int(bx),1,1), grid=(int(gx),1,1))
+            func(d_x1, d_y1,
+                 self.c_inv,
+                 n, m,
+                 d_preFac, d_w_norm, d_kde_val,
+                 block=(int(bx), 1, 1),
+                 grid=(int(gx), 1, 1))
 
         # backward copy from gpu to cpu memory
         self.cuda.memcpy_dtoh(h_kde_val, d_kde_val)

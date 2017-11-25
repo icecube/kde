@@ -1,162 +1,215 @@
-import numpy as n
+# pylint: disable=line-too-long, invalid-name
+
+
+from __future__ import absolute_import, division, print_function
+
+import numpy as np
+
 
 def rebin(a, *args, **kwargs):
-    '''rebin ndarray data into a smaller ndarray of the same rank whose dimensions
-    are factors of the original dimensions. eg. An array with 6 columns and 4 rows
-    can be reduced to have 6,3,2 or 1 columns and 4,2 or 1 rows.
-    example usages:
-    >>> a=rand(6,4); b=rebin(a,3,2)
-    >>> a=rand(6); b=rebin(a,2)
-    '''
-    method = kwargs.get("method","sum")
-    verbose = kwargs.get("verbose",False)
+    """Rebin ndarray data into a smaller ndarray of the same rank whose
+    dimensions are factors of the original dimensions. eg. An array with 6
+    columns and 4 rows can be reduced to have 6,3,2 or 1 columns and 4,2 or 1
+    rows.
+
+    Examples
+    --------
+    >>> a = np.rand(6, 4)
+    >>> b = rebin(a, 3, 2)
+    >>> print(b.shape)
+    (2, 2)
+
+    >>> a = np.rand(6)
+    >>> b = rebin(a, 2)
+    >>> print b.shape
+    (3,)
+
+    """
+    method = kwargs.get("method", "sum")
+    verbose = kwargs.get("verbose", False)
 
     shape = a.shape
     lenShape = len(shape)
-    factor = n.asarray(shape)/n.asarray(args)
-    evList = ['a.reshape('] + \
-    ['args[%d],factor[%d],'%(i,i) for i in range(lenShape)] + \
-    [')'] + ['.sum(%d)'%(i+1) for i in range(lenShape)]
-    
+    factor = np.asarray(shape) / np.asarray(args) # pylint: disable=unused-variable
+    evList = (
+        ['a.reshape('] +
+        ['args[%d],factor[%d],'%(i, i) for i in range(lenShape)] +
+        [')'] + ['.sum(%d)'%(i+1) for i in range(lenShape)]
+    )
+
     if method == "sum":
         pass
     elif method == "average":
         evList += ['/factor[%d]'%i for i in range(lenShape)]
     else:
-        raise AttributeError("method: %s not defined" %method)
+        raise AttributeError("method: %s not defined" % method)
+
+    evStr = ''.join(evList)
 
     if verbose:
-        print ''.join(evList)
+        print(evStr)
 
-    return eval(''.join(evList))
+    return eval(evStr) # pylint: disable=eval-used
+
 
 def covariance_form(point, mean, cov):
+    """Calculate 2D map of covariance form (2D quadratic approximation to
+    -2lnL)
+
     """
-    Calculates 2D map of covariance form (2D quadratic approximation to -2lnL)
-    """
-    cov_inv = n.linalg.inv(cov)
+    cov_inv = np.linalg.inv(cov)
     diff = point - mean
 
-    stats = [] 
+    stats = []
     for y_i in range(len(diff)):
         current_y = []
         for x_i in range(len(diff[y_i])):
-            a = n.matrix(diff[y_i][x_i]) 
+            a = np.matrix(diff[y_i][x_i])
             current_y.append((a * cov_inv * a.transpose()).item(0))
         stats.append(current_y)
-    return n.array(stats)
+    return np.array(stats)
+
 
 def estimate_cov_from_contour(xaxis, yaxis, zmesh, point):
-    """
-    Calculates estimate of covariance matrix from 2D Hessian of -2lnL
+    """Calculate estimate of covariance matrix from 2D Hessian of -2lnL
+
     Note:
     RectBivariateSpline expects zmesh to have shape (len(xaxis), len(yaxis))
-    but my mesh has shape (len(yaxis), len(xaxis))
-    thus everything is mirrored
+    but my mesh has shape (len(yaxis), len(xaxis)) thus everything is mirrored
+
     """
     from scipy.interpolate import RectBivariateSpline
-    x,y = point
-    spline = RectBivariateSpline(yaxis, xaxis, n.asarray(zmesh))
+    x, y = point
+    spline = RectBivariateSpline(yaxis, xaxis, np.asarray(zmesh))
     dx2 = 0.5 * spline(y, x, mth=None, dx=0, dy=2, grid=False)
     dy2 = 0.5 * spline(y, x, mth=None, dx=2, dy=0, grid=False)
     dxdy = 0.5 * spline(y, x, mth=None, dx=1, dy=1, grid=False)
 
-    hessian = n.matrix([[dx2, dxdy],[dxdy, dy2]])
-    cov = n.linalg.inv(hessian)
+    hessian = np.matrix([[dx2, dxdy], [dxdy, dy2]])
+    cov = np.linalg.inv(hessian)
     return cov
 
+
 def interpolate_statistic(xaxis, yaxis, zmesh, xaxis_new, yaxis_new):
-    """
-    Calculates 2D spline surface of -2lnL test-statistic. 
-    The same spline is used to calculate derivatives in "estimate_cov_from_contour(xaxis, yaxis, zmesh, point)"
+    """Calculate 2D spline surface of -2lnL test-statistic.
+
+    The same spline is used to calculate derivatives in
+    "estimate_cov_from_contour(xaxis, yaxis, zmesh, point)"
+
     Note:
     RectBivariateSpline expects zmesh to have shape (len(xaxis), len(yaxis))
     but my mesh has shape (len(yaxis), len(xaxis))
     thus everything is mirrored
-    """    
+
+    """
     from scipy.interpolate import RectBivariateSpline
-    spline = RectBivariateSpline(yaxis, xaxis, n.asarray(zmesh))
-    stats = [[spline(yaxis_new[yi], xaxis_new[xi], mth=None, dx=0, dy=0, grid=False) for xi in range(len(xaxis_new))] for yi in range(len(yaxis_new))]
-    return n.array(stats)
+    spline = RectBivariateSpline(yaxis, xaxis, np.asarray(zmesh))
+    stats = [[spline(yaxis_new[yi], xaxis_new[xi], mth=None, dx=0, dy=0, grid=False)
+              for xi in range(len(xaxis_new))]
+             for yi in range(len(yaxis_new))]
+    return np.array(stats)
+
 
 def wilks_test(profiles):
-    """
-    Calculate the compatibility of statistically independent measurements.
+    """Calculate the compatibility of statistically independent measurements.
+
     Here, we assume that Wilks' theorem holds.
-        profiles : list of (x,y,llh) for different measurements
+
+    Parameters
+    ----------
+    profiles : list of (x, y, llh) for different measurements
+
     """
-    sum_llhs = 0.
-    for xpar,ypar,llhs in profiles:
-        xmin = n.min([n.min(x) for x,y,z in profiles])
-        xmax = n.max([n.max(x) for x,y,z in profiles])
-        ymin = n.min([n.min(y) for x,y,z in profiles])
-        ymax = n.max([n.max(y) for x,y,z in profiles])
-        x = n.linspace(xmin, xmax, 1000)
-        y = n.linspace(ymin, ymax, 1000)
+    from scipy.stats import chisqprob
+    from scipy.special import erfinv
+
+    xmin, xmax = +np.inf, -np.inf
+    ymin, ymax = +np.inf, -np.inf
+    for x, y, _ in profiles:
+        xmin_, xmax_ = np.min(x), np.max(x)
+        if xmin_ < xmin:
+            xmin = xmin_
+        if xmax_ > xmax:
+            xmax = xmax_
+
+        ymin_, ymax_ = np.min(y), np.max(y)
+        if ymin_ < ymin:
+            ymin = ymin_
+        if ymax_ > ymax:
+            ymax = ymax_
+
+    x = np.linspace(xmin, xmax, 1000)
+    y = np.linspace(ymin, ymax, 1000)
+
+    sum_llhs = 0
+    for xpar, ypar, llhs in profiles:
         sum_llhs += interpolate_statistic(xpar, ypar, llhs, x, y)
 
-    chi2 = n.min(sum_llhs)
-    ndof = 2*(len(profiles)-1)
-    from scipy.stats import chisqprob
-    pvalue = chisqprob(chi2,ndof)
-    from scipy.special import erfinv
-    nsigma = erfinv(1-pvalue) * n.sqrt(2) # 2-sided significance
+    chi2 = np.min(sum_llhs)
+    ndof = 2 * (len(profiles) - 1)
+    pvalue = chisqprob(chi2, ndof)
+    nsigma = erfinv(1 - pvalue) * np.sqrt(2) # 2-sided significance
 
-    return (chi2,ndof,pvalue,nsigma)
+    return (chi2, ndof, pvalue, nsigma)
 
-def walds_test(profile1,profile2):
-    """
-    Calculate the compatibility of two statistically independent measurements
-    using normal approximation (Wald's method).
+
+def walds_test(profile1, profile2):
+    """Calculate the compatibility of two statistically independent
+    measurements using normal approximation (Wald's method).
+
     This assumes that the log-likelihood space is approximately elliptically.
-        profile1 : (x,y,llh) for measurement 1
-        profile2 : (x,y,llh) for measurement 2
+
+    Parameters
+    ----------
+    profile1 : (x,y,llh) for measurement 1
+    profile2 : (x,y,llh) for measurement 2
+
     """
-    bestfits,covariances = [],[]
-    for x,y,llhs in [profile1,profile2]:
-        idx_min = n.unravel_index(llhs.argmin(), llhs.shape)
-        bestfit = x[idx_min[1]],y[idx_min[0]]
+    from scipy.stats import chisqprob
+    from scipy.special import erfinv
+    bestfits, covariances = [], []
+    for x, y, llhs in [profile1, profile2]:
+        idx_min = np.unravel_index(llhs.argmin(), llhs.shape)
+        bestfit = x[idx_min[1]], y[idx_min[0]]
         bestfits.append(bestfit)
-        covariance = estimate_cov_from_contour(x,y,llhs,bestfit)
+        covariance = estimate_cov_from_contour(x, y, llhs, bestfit)
         covariances.append(covariance)
 
-    diff = n.matrix(bestfits[0]) - n.matrix(bestfits[1])
-    cov_inv = n.linalg.inv(covariances[0] + covariances[1])
+    diff = np.matrix(bestfits[0]) - np.matrix(bestfits[1])
+    cov_inv = np.linalg.inv(covariances[0] + covariances[1])
 
     chi2 = diff*cov_inv*diff.transpose()
     ndof = 2
-    from scipy.stats import chisqprob
-    pvalue = chisqprob(chi2,ndof)
-    from scipy.special import erfinv
-    nsigma = erfinv(1-pvalue) * n.sqrt(2) # 2-sided significance
+    pvalue = chisqprob(chi2, ndof)
+    nsigma = erfinv(1-pvalue) * np.sqrt(2) # 2-sided significance
 
-    return (chi2,ndof,pvalue,nsigma)
+    return (chi2, ndof, pvalue, nsigma)
+
 
 def _weighted_quantile_arg(values, weights, q=0.5):
-    indices = n.argsort(values)
-    sorted_indices = n.arange(len(values))[indices]
+    indices = np.argsort(values)
+    sorted_indices = np.arange(len(values))[indices]
     medianidx = (weights[indices].cumsum()/weights[indices].sum()).searchsorted(q)
-    if (0 <= medianidx) and (medianidx < len(values)):
+    if (medianidx >= 0) and (medianidx < len(values)):
         return sorted_indices[medianidx]
-    else:
-        return n.nan
+    return np.nan
+
 
 def weighted_quantile(values, weights, q=0.5):
     if len(values) != len(weights):
         raise ValueError("shape of `values` and `weights` doesn't match!")
     index = _weighted_quantile_arg(values, weights, q=q)
-    if index != n.nan:
+    if index != np.nan:
         return values[index]
-    else:
-        return n.nan
+    return np.nan
+
 
 def weighted_median(values, weights):
     return weighted_quantile(values, weights, q=0.5)
 
-def weighted_cov(m, y=None, weights=None, bias=0):
 
-    """
-    Estimate a (weighted) covariance matrix, given data.
+def weighted_cov(m, y=None, weights=None, bias=0):
+    """Estimate a (weighted) covariance matrix, given data.
 
     Covariance indicates the level to which two variables vary together.
     If we examine N-dimensional samples, :math:`X = [x_1, x_2, ... x_N]^T`,
@@ -169,14 +222,14 @@ def weighted_cov(m, y=None, weights=None, bias=0):
     m : array_like
         A 1-D or 2-D array containing multiple variables and observations.
         Each row of `m` represents a variable, and each column a single
-        observation of all those variables. 
+        observation of all those variables.
     y : array_like, optional
         An additional set of variables and observations. `y` has the same
         form as that of `m`.
     weights : array_like, optional
-              A 1-D array containing the weights of the data points.
-              This option should be used if data points have different weights
-              in order to calculate the weighted covariance.
+        A 1-D array containing the weights of the data points. This option
+        should be used if data points have different weights in order to
+        calculate the weighted covariance.
     bias : int, optional
         Default normalization is by ``(N - 1)``, where ``N`` is the number of
         observations given (unbiased estimate). If `bias` is 1, then
@@ -212,49 +265,49 @@ def weighted_cov(m, y=None, weights=None, bias=0):
     >>> x = [-2.1, -1,  4.3]
     >>> y = [3,  1.1,  0.12]
     >>> X = np.vstack((x,y))
-    >>> print weighted_cov(X)
+    >>> print(weighted_cov(X))
     [[ 11.71        -4.286     ]
      [ -4.286        2.14413333]]
-    >>> print weighted_cov(x, y)
+    >>> print(weighted_cov(x, y))
     [[ 11.71        -4.286     ]
      [ -4.286        2.14413333]]
-    >>> print weighted_cov(x)
+    >>> print(weighted_cov(x))
     11.71
 
     """
-    X = n.array(m, ndmin=2, dtype=float)
+    X = np.array(m, ndmin=2, dtype=float)
     if X.size == 0:
         # handle empty arrays
         return np.array(m)
+
     axis = 0
-    tup = (slice(None), n.newaxis)
+    tup = (slice(None), np.newaxis)
 
     N = X.shape[1]
 
     if weights is not None:
-        weights = n.asarray(weights)/n.sum(weights)
-        if len(weights)!=N:
+        weights = np.asarray(weights)/np.sum(weights)
+        if len(weights) != N:
             raise ValueError("unequal dimension of `data` and `weights`.")
 
     if y is not None:
-        y = n.array(y, copy=False, ndmin=2, dtype=float)
-        X = n.concatenate((X, y), axis)
+        y = np.array(y, copy=False, ndmin=2, dtype=float)
+        X = np.concatenate((X, y), axis)
 
-    X -= n.average(X,axis=1-axis,weights=weights)[tup]
+    X -= np.average(X, axis=1-axis, weights=weights)[tup]
 
     if bias == 0:
         if weights is not None:
-            fact = n.sum(weights)/(n.sum(weights)**2 - n.sum(weights**2))
+            fact = np.sum(weights) / (np.sum(weights)**2 - np.sum(weights**2))
         else:
-            fact = 1./float(N - 1)
+            fact = 1 / (N - 1)
     else:
         if weights is not None:
-            fact = 1./n.sum(weights)
+            fact = 1 / np.sum(weights)
         else:
-            fact = 1./float(N)
+            fact = 1 / N
 
     if weights is not None:
-        return (n.dot(weights * X, X.T.conj()) * fact).squeeze()
-    else:
-        return (n.dot(X, X.T.conj()) * fact).squeeze()
+        return (np.dot(weights * X, X.T.conj()) * fact).squeeze()
 
+    return (np.dot(X, X.T.conj()) * fact).squeeze()

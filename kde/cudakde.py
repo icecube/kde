@@ -1,10 +1,15 @@
-import numpy as n
-import warnings
+# pylint: disable=invalid-name
 
-from classes import KDE
+
+from __future__ import absolute_import, division
+
+import warnings
+import numpy as n
+from .classes import KDE
+
 
 class gaussian_kde(KDE):
-    def __init__(self, data, weights=[], kde_values=None, use_cuda=True,
+    def __init__(self, data, weights=None, kde_values=None, use_cuda=True,
                  adaptive=False, weight_adaptive_bw=False, alpha=0.3,
                  bw_method='silverman'):
         if kde_values != None:
@@ -13,7 +18,7 @@ class gaussian_kde(KDE):
         KDE.__init__(self, data, use_cuda, weights=weights, alpha=alpha,
                      method=bw_method)
 
-        self.weighted = len(weights) > 0
+        self.weighted = False if weights is None or len(weights) == 0 else True
 
         if adaptive:
             if not self.weighted and weight_adaptive_bw:
@@ -31,7 +36,7 @@ class gaussian_kde(KDE):
 
 
 class bootstrap_kde(object):
-    def __init__(self, data, niter=10, weights=[], **kwargs):
+    def __init__(self, data, niter=10, weights=None, **kwargs):
         assert int(niter) == float(niter)
         niter = int(niter)
 
@@ -40,17 +45,17 @@ class bootstrap_kde(object):
 
         self.data = n.atleast_2d(data)
         self.d, self.n = self.data.shape
-        self.weighted = len(weights) > 0
+        self.weighted = False if weights is None or len(weights) == 0 else True
 
-        for i in xrange(int(niter)):
+        for _ in xrange(niter):
             indices = n.array(self.get_bootstrap_indices())
             self.bootstrap_indices.append(indices)
             if self.weighted:
-                kernel = gaussian_kde(data[...,indices],
+                kernel = gaussian_kde(data[..., indices],
                                       weights=weights[indices],
                                       **kwargs)
             else:
-                kernel = gaussian_kde(data[...,indices], **kwargs)
+                kernel = gaussian_kde(data[..., indices], **kwargs)
             self.kernels.append(kernel)
 
     def __call__(self, points):
@@ -58,7 +63,7 @@ class bootstrap_kde(object):
 
     def evaluate(self, points):
         points = n.atleast_2d(points)
-        d, m = points.shape
+        _, m = points.shape
         means, sqmeans = n.zeros(m), n.zeros(m)
         for kernel in self.kernels:
             values = kernel(points)
@@ -70,6 +75,5 @@ class bootstrap_kde(object):
         return means, errors
 
     def get_bootstrap_indices(self):
-        indices = n.arange(self.n)
         bootstrap_indices = n.random.choice(self.n, size=self.n, replace=True)
         return bootstrap_indices

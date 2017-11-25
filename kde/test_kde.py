@@ -44,9 +44,9 @@ def test_kde(version, sampling_method, bw_method, n_samples, adaptive,
     bw_method = bw_method.strip().lower()
 
     if version == "pykde":
-        from kde.pykde import bootstrap_kde, gaussian_kde
+        from .pykde import bootstrap_kde, gaussian_kde
     elif version == "cudakde":
-        from kde.cudakde import bootstrap_kde, gaussian_kde
+        from .cudakde import bootstrap_kde, gaussian_kde
     else:
         raise ValueError('`version` must be one of "pykde" or "cudakde".')
 
@@ -235,14 +235,6 @@ def test_kde(version, sampling_method, bw_method, n_samples, adaptive,
 
 def main():
     """Main"""
-    test_kde(version='cudakde',
-             sampling_method='exponential',
-             bw_method='silverman',
-             n_samples=100,
-             adaptive=True,
-             alpha=0.3,
-             weight_adaptive_bw=True)
-    print("<< test_kde.py / cudakde : PASS >>")
     test_kde(version='pykde',
              sampling_method='exponential',
              bw_method='silverman',
@@ -251,6 +243,14 @@ def main():
              alpha=0.3,
              weight_adaptive_bw=False)
     print("<< test_kde.py / pykde : PASS >>")
+    test_kde(version='cudakde',
+             sampling_method='exponential',
+             bw_method='silverman',
+             n_samples=100,
+             adaptive=True,
+             alpha=0.3,
+             weight_adaptive_bw=True)
+    print("<< test_kde.py / cudakde : PASS >>")
 
 
 if __name__ == "__main__":
