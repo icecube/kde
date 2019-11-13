@@ -50,7 +50,7 @@ static PyObject *pr_kde_1d(PyObject *self, PyObject *args){
 
 	////////////////// DECLARATIONS ///////////////////////
 	int ListSize1, ListSize2, i,j;
-	double c, detC, res, ent, d, h;
+	double c, res, ent, h;
 	PyObject *objx, *objy, *objpreFac, *objw_norm;
 	PyObject *ListItem, *ListItem2, *ListItem3;
 	double *x, *y, *preFac, *w_norm;
@@ -58,9 +58,7 @@ static PyObject *pr_kde_1d(PyObject *self, PyObject *args){
 	/////////////////// GET INPUT //////////////////////////
 	if (!PyArg_ParseTuple(args, "dOOdOO", &c, &objx, &objy, &h, &objpreFac, &objw_norm))
 		return NULL;
-
-	d = 1.0;
-	detC = c;
+	
 
 	////////// GET FIRST LIST-GROUP FROM PYTHON ////////////
 	ListSize1 = PyList_Size(objx);
@@ -126,17 +124,14 @@ static PyObject *pr_kde_2d(PyObject *self, PyObject *args){
 
 	////////////////// DECLARATIONS ///////////////////////
 	int ListSize1, ListSize2, i,j;
-	double c11, c12, c21, c22, detC, res, ent1, ent2, d, h;
+	double c11, c12, c21, c22, res, ent1, ent2, h;
 	PyObject *objx1, *objx2, *objy1, *objy2, *objpreFac, *objw_norm;
 	PyObject *ListItem, *ListItem2, *ListItem3, *ListItem4;
 	double *x1, *x2, *y1,*y2, *preFac, *w_norm;
 
 	/////////////////// GET INPUT //////////////////////////
 	if (!PyArg_ParseTuple(args, "ddddOOOOdOO", &c11, &c12, &c21, &c22, &objx1, &objx2, &objy1, &objy2, &h, &objpreFac, &objw_norm))
-		return NULL;
-
-	d = 2.0;
-	detC = c11*c22 - c12*c21;
+		return NULL;	
 
 	////////// GET FIRST LIST-GROUP FROM PYTHON ////////////
 	ListSize1 = PyList_Size(objx2);
@@ -216,8 +211,8 @@ static PyObject *pr_kde_2d(PyObject *self, PyObject *args){
 static PyObject *pr_getLambda_1d(PyObject *self, PyObject *args){
 
 	////////////////// DECLARATIONS ///////////////////////
-	int ListSize1, i,j, d;
-	double c, detC, thisKde, ent, invGlob, logSum, alpha, h, preFac; //, tempNorm, weight, tempNormOld;
+	int ListSize1, i,j;
+	double c, thisKde, ent, invGlob, logSum, alpha, h, preFac; //, tempNorm, weight, tempNormOld;
 	PyObject *objx;
 	PyObject *ListItem, *ListItem2;
 	PyObject *obj_w_norm;
@@ -252,9 +247,7 @@ static PyObject *pr_getLambda_1d(PyObject *self, PyObject *args){
 	lambdaList = PyList_New(ListSize1);
 
 	invGlob = 0.0;
-	logSum = 0.0;
-	d = 1.0;
-	detC = c;
+	logSum = 0.0;	
 	preFac = -0.5/pow(h, 2);
 
 	for(i=0; i < ListSize1; i++) {
@@ -289,8 +282,8 @@ static PyObject *pr_getLambda_1d(PyObject *self, PyObject *args){
 
 static PyObject *pr_getLambda_2d(PyObject *self, PyObject *args){
 	////////////////// DECLARATIONS ///////////////////////
-	int ListSize1, i,j, d;
-	double c11, c12, c21, c22, detC, thisKde, ent1, ent2, invGlob, logSum, alpha, h, preFac; // , tempNorm, weight;
+	int ListSize1, i,j;
+	double c11, c12, c21, c22, thisKde, ent1, ent2, invGlob, logSum, alpha, h, preFac; // , tempNorm, weight;
 	PyObject *objx1, *objx2, *obj_w_norm;
 	PyObject *ListItem, *ListItem2, *ListItem3;
 	double *x1, *x2, *lambda, *kde, *w_norm;
@@ -329,8 +322,6 @@ static PyObject *pr_getLambda_2d(PyObject *self, PyObject *args){
 
 	invGlob = 0.0;
 	logSum = 0.0;
-	d = 2.0;
-	detC = c11*c22 - c12*c21;
 	preFac = -0.5/(h*h);
 
 	for(i=0; i < ListSize1; i++) {
@@ -511,7 +502,7 @@ static PyObject *pr_getLambda_ND(PyObject *self, PyObject *args){
 	for( i=0; i < ndim*ndata; i++ ) {
 		ListItem = PyList_GetItem(obj_entries , i);
 
-		if( PyFloat_Check(ListItem) && PyFloat_Check(ListItem_w)) {
+		if( PyFloat_Check(ListItem)) {
 			x[i] = PyFloat_AsDouble(ListItem);
 		} else {
 			printf("Error: lists contain a non-float value.\n");
@@ -586,6 +577,15 @@ static PyMethodDef PrMethods[] = {
 	{NULL, NULL, 0, NULL}
 };
 
-void initkde(void){
-	(void) Py_InitModule("kde", PrMethods);
+static struct PyModuleDef kde =
+{
+    PyModuleDef_HEAD_INIT,
+    "kde", /* name of module */
+    "",          /* module documentation, may be NULL */
+    -1,          /* size of per-interpreter state of the module, or -1 if the module keeps state in global variables. */
+    PrMethods
+};
+
+PyMODINIT_FUNC PyInit_kde(void) {
+	return PyModule_Create(&kde);
 }
