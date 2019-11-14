@@ -70,7 +70,7 @@ class bootstrap_kde(object):
         self.d, self.n = self.data.shape
         self.weighted = False if weights is None or len(weights) == 0 else True
 
-        for _ in xrange(niter):
+        for _ in range(niter):
             indices = n.array(self.get_bootstrap_indices())
             self.bootstrap_indices.append(indices)
             if self.weighted:

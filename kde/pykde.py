@@ -284,7 +284,7 @@ class gaussian_kde(object):
         if adaptive:
             inv_loc_bw = self.inv_loc_bw # pylint: disable=unused-variable
 
-            for i in xrange(nloops):
+            for i in range(nloops):
                 index = i*dm
                 if modulo_dm and i == (nloops-1):
                     dm = modulo_dm
@@ -309,7 +309,7 @@ class gaussian_kde(object):
                 del pt
 
         else:
-            for i in xrange(nloops):
+            for i in range(nloops):
                 index = i*dm
                 if modulo_dm and i == (nloops-1):
                     dm = modulo_dm
@@ -466,12 +466,12 @@ class bootstrap_kde(object):
 
         self.dataset = np.atleast_2d(dataset)
         self.d, self.n = self.dataset.shape
-        if kwargs.has_key("weights"):
+        if "weights" in kwargs:
             weights = kwargs.pop("weights")
         else:
             weights = None
 
-        for _ in xrange(niter):
+        for _ in range(niter):
             indices = self.get_bootstrap_indices()
             self.bootstrap_indices.append(indices)
             if weights is not None:
