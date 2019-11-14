@@ -208,7 +208,7 @@ class KDE(object):
         weightedCov : bool
 
         """
-        if isinstance(self.hMethod, basestring):
+        if isinstance(self.hMethod, str):
             if self.hMethod == 'silverman':
                 # (n * (d + 2) / 4.)**(-1. / (d + 4)).
                 self.h = np.power(1.0/(self.n*(self.d+2.0)/4.0), 1.0/(self.d+4.0))
