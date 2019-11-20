@@ -8,7 +8,7 @@ if __name__ == "__main__":
     ckde = Extension(
         name='kde.kde',
         sources=['kde/kde.c'],
-        extra_compile_args=['-Wall', '-O3', '-fPIC']
+        extra_compile_args=['-Wall', '-O3', '-fPIC', '-Werror']
     )
 
     setup(
