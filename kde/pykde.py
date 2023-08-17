@@ -206,7 +206,7 @@ class gaussian_kde(object):
         max_array_length = 1e8
         """Maximum amount of data in memory (~2GB, scales linearly)"""
 
-        self.m_max = np.int(np.floor(max_array_length/self.n))
+        self.m_max = int(np.floor(max_array_length/self.n))
         if self.n > max_array_length:
             raise ValueError("`dataset` is too large (too many array entries)!")
 
@@ -277,7 +277,7 @@ class gaussian_kde(object):
                 msg = "points have dimension %s, dataset has dimension %s" % (d, self.d)
                 raise ValueError(msg)
 
-        nloops = np.int(np.ceil(m/self.m_max))
+        nloops = int(np.ceil(m/self.m_max))
         dm = self.m_max
         modulo_dm = m%dm
         results = np.empty((m,), dtype=float)
