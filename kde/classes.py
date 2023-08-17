@@ -62,10 +62,10 @@ class KDE(object):
         self.alpha = alpha
 
         if weights is None or len(weights) == 0:
-            self.w = np.full(shape=self.n, fill_value=1/self.n, dtype=np.float)
+            self.w = np.full(shape=self.n, fill_value=1/self.n, dtype=float)
             self.setCovariance(weights=False)
         elif len(weights) == self.n:
-            self.w = np.asarray(weights, dtype=np.float) / np.sum(weights)
+            self.w = np.asarray(weights, dtype=float) / np.sum(weights)
             self.setCovariance(weights=True)
         else:
             raise AssertionError("Length of data (%d) and length of weights"
@@ -230,7 +230,7 @@ class KDE(object):
             self.weights = self.w
         else:
             self.weights = np.full(shape=self.n, fill_value=1/self.n,
-                                   dtype=np.float)
+                                   dtype=float)
 
         if mode == "lambdas":
             self.w_norm_lambdas = self.weights * np.sqrt(self.detC / np.power(2.0*np.pi*self.h*self.h, self.d))
